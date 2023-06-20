@@ -5,11 +5,12 @@ on:
     # Do conversion every day at 00:03 clock UTC
     - cron: "3 0 * * *"
   workflow_dispatch:
+  push:
 
 env:
   CARGO_TERM_COLOR: always
   REGISTRY: ghcr.io
-  ORGANIZATION: ${{ github.repository }}
+  ORGANIZATION: desiki-high
   IMAGE_LIST_PATH: misc/top_images/image_list.txt
   FSCK_PATCH_PATH: misc/top_images/fsck.patch
 
