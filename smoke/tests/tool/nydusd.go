@@ -185,7 +185,9 @@ func newNydusd(conf NydusdConfig) (*Nydusd, error) {
 		"--apisock",
 		conf.APISockPath,
 		"--log-level",
-		"error",
+		"debug",
+		"--log-file",
+		"/tmp/nydusd.log",
 	}
 	if len(conf.ConfigPath) > 0 {
 		args = append(args, "--config", conf.ConfigPath)

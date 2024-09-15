@@ -227,12 +227,12 @@ func (a *APIV1TestSuite) TestMount(t *testing.T) {
 	config.EnablePrefetch = ctx.Runtime.EnablePrefetch
 	config.DigestValidate = false
 	config.AmplifyIO = ctx.Runtime.AmplifyIO
-	err = nydusd.MountByAPI(config)
-	require.NoError(t, err)
-
-	defer nydusd.Umount()
-	defer nydusd.UmountByAPI(config.MountPath)
-	nydusd.VerifyByPath(t, rootFs.FileTree, config.MountPath)
+	for i := 0; i < 10000; i++ {
+		err = nydusd.MountByAPI(config)
+		require.NoError(t, err)
+		nydusd.UmountByAPI(config.MountPath)
+	}
+	// defer nydusd.Umount()
 }
 
 func (a *APIV1TestSuite) buildLayer(t *testing.T, ctx *tool.Context, rootFs *tool.Layer) string {

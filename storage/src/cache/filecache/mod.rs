@@ -23,7 +23,7 @@ use crate::cache::state::{
 use crate::cache::worker::{AsyncPrefetchConfig, AsyncWorkerMgr};
 use crate::cache::{BlobCache, BlobCacheMgr};
 use crate::device::{BlobFeatures, BlobInfo};
-
+use crate::factory::ASYNC_RUNTIME_1;
 pub const BLOB_RAW_FILE_SUFFIX: &str = ".blob.raw";
 pub const BLOB_DATA_FILE_SUFFIX: &str = ".blob.data";
 
@@ -127,6 +127,11 @@ impl BlobCacheMgr for FileCacheMgr {
         if !self.closed.load(Ordering::Acquire) {
             self.closed.store(true, Ordering::Release);
             self.worker_mgr.stop();
+            log::warn!("destroy {}", Arc::strong_count(&self.runtime)); // 2
+            log::warn!(
+                "Arc::strong_count of ASYNC_RUNTIME_1: {}",
+                Arc::strong_count(&ASYNC_RUNTIME_1)
+            ); // 2
             self.backend().shutdown();
             self.metrics.release().unwrap_or_else(|e| error!("{:?}", e));
         }
@@ -150,7 +155,15 @@ impl BlobCacheMgr for FileCacheMgr {
             let mut guard = self.blobs.write().unwrap();
             if let Some(entry) = guard.get(key) {
                 if Arc::strong_count(entry) == 1 {
-                    guard.remove(key);
+                    log::warn!(
+                        "Arc::strong_count of ASYNC_RUNTIME_1: {}",
+                        Arc::strong_count(&ASYNC_RUNTIME_1)
+                    ); // 3
+                    guard.remove(key); // 释放了一个引用
+                    log::warn!(
+                        "Arc::strong_count of ASYNC_RUNTIME_1: {}",
+                        Arc::strong_count(&ASYNC_RUNTIME_1)
+                    ); // 2
                 }
             }
         }

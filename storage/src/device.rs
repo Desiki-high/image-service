@@ -1110,6 +1110,7 @@ impl BlobDevice {
     /// Create new blob device instance.
     pub fn new(config: &Arc<ConfigV2>, blob_infos: &[Arc<BlobInfo>]) -> io::Result<BlobDevice> {
         let mut blobs = Vec::with_capacity(blob_infos.len());
+        // log
         for blob_info in blob_infos.iter() {
             let blob = BLOB_FACTORY.new_blob_cache(config, blob_info)?;
             blobs.push(blob);

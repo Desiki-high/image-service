@@ -619,6 +619,7 @@ impl FsCacheHandler {
                         });
                         let object = FsCacheObject::Bootstrap(bootstrap.clone());
                         e.insert((object, msg.fd));
+                        log::warn!("test");
                         ASYNC_RUNTIME.spawn_blocking(|| async move {
                             // Ensure copen reply message has been sent to kernel.
                             {

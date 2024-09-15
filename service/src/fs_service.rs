@@ -24,6 +24,7 @@ use fuse_backend_rs::passthrough::{CachePolicy, Config as passthrough_config, Pa
 use nydus_api::ConfigV2;
 use nydus_rafs::fs::Rafs;
 use nydus_rafs::{RafsError, RafsIoRead};
+use nydus_storage::factory::ASYNC_RUNTIME_1;
 use nydus_storage::factory::BLOB_FACTORY;
 use serde::{Deserialize, Serialize};
 use versionize::{VersionMap, Versionize, VersionizeResult};
@@ -190,9 +191,16 @@ pub trait FsService: Send + Sync {
             mgr_guard.save_vfs_stat(self.get_vfs())?;
         }
 
-        debug!("try to gc unused blobs");
+        info!("try to gc unused blobs");
+        log::warn!(
+            "Arc::strong_count of ASYNC_RUNTIME_1: {}",
+            Arc::strong_count(&ASYNC_RUNTIME_1)
+        ); // 3
         BLOB_FACTORY.gc(None);
-
+        log::warn!(
+            "Arc::strong_count of ASYNC_RUNTIME_1: {}",
+            Arc::strong_count(&ASYNC_RUNTIME_1)
+        ); // 1
         Ok(())
     }
 

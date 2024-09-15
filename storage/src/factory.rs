@@ -56,6 +56,27 @@ lazy_static! {
     };
 }
 
+lazy_static! {
+    pub static ref ASYNC_RUNTIME_1: Arc<Runtime> = {
+        let runtime = Builder::new_multi_thread()
+                .worker_threads(1) // Limit the number of worker thread to 1 since this runtime is generally used to do blocking IO.
+                .thread_keep_alive(Duration::from_secs(10))
+                .max_blocking_threads(8)
+                .thread_name("cache-flusher-1")
+                .enable_all()
+                .on_thread_start(||{ log::warn!("cache-flusher-1-start")})
+                .on_thread_stop(|| { log::warn!("cache-flusher-1-stop")})
+                .build();
+        match runtime {
+            Ok(v) => {
+                log::warn!("ASYNC_RUNTIME1");
+                Arc::new(v)
+            }
+            Err(e) => panic!("failed to create tokio async runtime, {}", e),
+        }
+    };
+}
+
 #[derive(Eq, PartialEq)]
 struct BlobCacheMgrKey {
     config: Arc<ConfigV2>,
@@ -130,19 +151,34 @@ impl BlobFactory {
         let mut guard = self.mgrs.lock().unwrap();
         // Use the existing blob cache manager if there's one with the same configuration.
         if let Some(mgr) = guard.get(&key) {
+            log::warn!("guard.len(): {}", guard.len()); // 1
+            log::warn!("Use the existing blob cache manager");
+            log::warn!("Arc::strong_count1: {}", Arc::strong_count(mgr)); // 1
+
             return mgr.get_blob_cache(blob_info);
         }
+        log::warn!("guard.len(): {}", guard.len()); // 0
+        log::warn!("Use new blob cache manager");
         let backend = Self::new_backend(backend_cfg, &blob_info.blob_id())?;
-        let mgr = match cache_cfg.cache_type.as_str() {
+        log::warn!("cache_cfg.cache_type: {}", cache_cfg.cache_type.as_str());
+        let mgr: Arc<dyn BlobCacheMgr> = match cache_cfg.cache_type.as_str() {
             "blobcache" | "filecache" => {
+                log::warn!(
+                    "Arc::strong_count of ASYNC_RUNTIME_1: {}",
+                    Arc::strong_count(&ASYNC_RUNTIME_1)
+                ); // 1
                 let mgr = FileCacheMgr::new(
                     cache_cfg,
                     backend,
-                    ASYNC_RUNTIME.clone(),
+                    ASYNC_RUNTIME_1.clone(),
                     &config.id,
                     user_io_batch_size,
                 )?;
                 mgr.init()?;
+                log::warn!(
+                    "Arc::strong_count of ASYNC_RUNTIME_1: {}",
+                    Arc::strong_count(&ASYNC_RUNTIME_1)
+                ); // 2
                 Arc::new(mgr) as Arc<dyn BlobCacheMgr>
             }
             #[cfg(target_os = "linux")]
@@ -166,7 +202,12 @@ impl BlobFactory {
 
         let mgr = guard.entry(key).or_insert_with(|| mgr);
 
-        mgr.get_blob_cache(blob_info)
+        let r = mgr.get_blob_cache(blob_info);
+        log::warn!(
+            "Arc::strong_count of ASYNC_RUNTIME_1: {}",
+            Arc::strong_count(&ASYNC_RUNTIME_1)
+        ); // 3
+        r
     }
 
     /// Garbage-collect unused blob cache managers and blob caches.
@@ -185,6 +226,10 @@ impl BlobFactory {
             }
         } else {
             for (key, mgr) in self.mgrs.lock().unwrap().iter() {
+                log::warn!(
+                    "Arc::strong_count of ASYNC_RUNTIME_1: {}",
+                    Arc::strong_count(&ASYNC_RUNTIME_1)
+                ); // 3
                 if mgr.gc(None) {
                     mgrs.push((
                         BlobCacheMgrKey {
@@ -195,13 +240,20 @@ impl BlobFactory {
                 }
             }
         }
-
+        log::warn!(
+            "Arc::strong_count of ASYNC_RUNTIME_1: {}",
+            Arc::strong_count(&ASYNC_RUNTIME_1)
+        ); // 2
         for (key, mgr) in mgrs {
             let mut guard = self.mgrs.lock().unwrap();
             if mgr.gc(None) {
                 guard.remove(&key);
             }
         }
+        log::warn!(
+            "Arc::strong_count of ASYNC_RUNTIME_1: {}",
+            Arc::strong_count(&ASYNC_RUNTIME_1)
+        ); // 1
     }
 
     pub fn supported_backends() -> Vec<String> {

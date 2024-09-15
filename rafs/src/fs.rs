@@ -87,6 +87,7 @@ impl Rafs {
         let (sb, reader) = RafsSuper::load_from_file(path, cfg.clone(), false)
             .map_err(RafsError::FillSuperBlock)?;
         let blob_infos = sb.superblock.get_blob_infos();
+        // log
         let device = BlobDevice::new(cfg, &blob_infos).map_err(RafsError::CreateDevice)?;
 
         if cfg.is_chunk_validation_enabled() && sb.meta.has_inlined_chunk_digest() {
