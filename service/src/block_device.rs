@@ -603,6 +603,7 @@ mod tests {
 
             let (res, buf) = device.async_read(0x208, 1, buf).await;
             assert_eq!(buf.len(), 8192);
+            // Custom { kind: Other, error: "Unknown frame descriptor" }
             assert_eq!(res.unwrap(), 4096);
 
             let (res, buf) = device.async_read(0x209, 1, buf).await;
